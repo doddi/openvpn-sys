@@ -2,18 +2,25 @@
   import { invoke } from "@tauri-apps/api/tauri"
   import {listen} from "@tauri-apps/api/event";
 
-  let connectionStatus = "Ready"
-  let connectButtonEnabled = true
+  let connectionStatus = "Unknown"
+  let connectButtonDisabled = true
 
   async function connect(){
-    connectButtonEnabled = false
-    await invoke("connect", { name })
+    connectButtonDisabled = true
+    await invoke("connect")
+    connectButtonDisabled = false;
   }
 
   async function setup() {
     await listen('connect_status', (event) => {
-      connectionStatus = event.payload
+      console.log(event);
+      connectionStatus = event.payload.connection_status
     });
+
+    console.log('checking status');
+    connectionStatus = await invoke('check_status');
+    connectButtonDisabled = connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected'
+    console.log(connectionStatus);
   }
 
   setup();
@@ -21,10 +28,20 @@
 
 <div>
   <div class="row">
-    <button on:click={connect} disabled={!connectButtonEnabled} >
-      Connect
+    <button on:click={connect} disabled={connectButtonDisabled} >
+      {connectionStatus === 'Connected' ? "Disconnect" : "Connect" }
     </button>
   </div>
   <p>{connectionStatus}</p>
 </div>
 
+<style>
+  button:disabled {
+    background-color: grey;
+    color: black;
+  }
+  button {
+    background-color: blue;
+    color: white;
+  }
+</style>
