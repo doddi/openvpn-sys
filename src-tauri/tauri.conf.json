@@ -21,6 +21,10 @@
     "bundle": {
       "active": true,
       "icon": [
+        "icons/SON_hexagon_disconnected.png",
+        "icons/SON_hexagon_connected.png",
+        "icons/SON_hexagon_intermediate.png",
+        "icons/SON_hexagon_error.png",
         "icons/32x32.png",
         "icons/128x128.png",
         "icons/128x128@2x.png",
@@ -48,7 +52,7 @@
       }
     ],
     "systemTray": {
-      "iconPath": "icons/icon.png",
+      "iconPath": "icons/SON_hexagon_disconnected.png",
       "iconAsTemplate": true
     }
   }
