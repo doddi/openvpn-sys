@@ -5,7 +5,7 @@ use std::fmt;
 use std::fmt::Formatter;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::sync::{Mutex, MutexGuard};
+use std::sync::{Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 use tauri::{AppHandle, CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent};
@@ -69,8 +69,8 @@ impl IconChoice for ConnectionStatus {
 
 
 #[tauri::command]
-async fn check_status(app: AppHandle,
-                      state: tauri::State<'_, Mutex<OpenVpnState>>) -> Result<ConnectionStatus, ()>{
+async fn check_status(
+    state: tauri::State<'_, Mutex<OpenVpnState>>) -> Result<ConnectionStatus, ()>{
     sleep(Duration::from_secs(2));
     Ok(state.lock().unwrap().connection_status)
 }
