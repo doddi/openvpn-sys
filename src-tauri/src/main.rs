@@ -1,7 +1,10 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use std::fmt;
+mod openvpn;
+mod vpn;
+
+use std::{env, fmt};
 use std::fmt::Formatter;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
@@ -107,22 +110,29 @@ impl fmt::Display for ConnectionStatus {
 
 #[derive(Copy, Clone, serde::Serialize)]
 struct OpenVpnState {
+    config_file: String,
     connection_status: ConnectionStatus
 }
 
 impl OpenVpnState {
-    fn new(connection_status: ConnectionStatus) -> OpenVpnState {
-        OpenVpnState { connection_status }
+    fn new(config_file: String,
+           connection_status: ConnectionStatus) -> OpenVpnState {
+        OpenVpnState { config_file, connection_status }
     }
 }
 
 impl Default for OpenVpnState {
     fn default() -> Self {
-        OpenVpnState::new(ConnectionStatus::Disconnected)
+        OpenVpnState::new(
+            String::from("sonatype.ovpn"),
+            ConnectionStatus::Disconnected)
     }
 }
 
 fn main() {
+    env::set_current_dir("/home/mdodgson/work/sonatype/config")
+        .expect("Unable to set working directory to configuration location");
+
     let open = CustomMenuItem::new("open".to_string(), "Open");
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
     let tray_menu = SystemTrayMenu::new()
