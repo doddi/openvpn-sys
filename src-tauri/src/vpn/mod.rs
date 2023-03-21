@@ -1,7 +1,3 @@
-pub struct VpnConnector {
-    status: Status
-}
-
 #[derive(PartialEq, Debug)]
 pub enum VpnStatus {
     Connected,
@@ -12,7 +8,7 @@ pub enum VpnStatus {
 }
 
 pub trait Connector {
-    fn connect(&self) -> VpnStatus;
-    fn disconnect(&self) -> VpnStatus;
-    fn status(&self) -> VpnStatus;
+    fn connect(&mut self) -> &VpnStatus;
+    fn disconnect(&mut self) -> &VpnStatus;
+    fn status(&mut self) -> &VpnStatus;
 }

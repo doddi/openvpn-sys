@@ -1,42 +1,49 @@
 use std::io::BufRead;
 use std::process::Command;
-use crate::vpn::{VpnConnector, Connector, VpnStatus};
+use crate::vpn::{Connector, VpnStatus};
 
 
-pub enum OpenVpnStatsResult {
+enum OpenVpnStatsResult {
     Ok(String),
     Err(String)
 }
 
-struct OpenVpn;
-
+pub struct OpenVpn<'a> {
+    config: &'a str,
+    status: VpnStatus
+}
 
 impl OpenVpn {
-    pub fn connect_open_vpn(config: &str) -> VpnStatus {
+    pub fn new(config: &str) -> Self {
+        OpenVpn { config, status: VpnStatus::Disconnected }
+    }
+
+    fn connect_open_vpn(&mut self, config: &str) -> &VpnStatus {
         let result = Command::new("openvpn3")
             .arg("session-start")
             .arg("--config")
             .arg(config)
             .output();
 
-        return match result {
+        self.status =  match result {
             Ok(output) => {
                 if !output.stdout.is_empty() {
                     let response = String::from_utf8(output.stdout.clone()).unwrap();
                     if response.contains("** ERROR **") {
-                        return VpnStatus::Disconnected
+                        VpnStatus::Disconnected
                     }
-                    return VpnStatus::Connecting
+                    VpnStatus::Connecting
                 }
                 VpnStatus::Error(String::from_utf8(output.stderr).clone().unwrap())
             }
             Err(_) => {
                 VpnStatus::Error(String::from("Unable to connect"))
             }
-        }
+        };
+        return &self.status
     }
 
-    pub fn get_open_vpn_stats(config: &str) -> OpenVpnStatsResult {
+    fn get_open_vpn_stats(config: &str) -> OpenVpnStatsResult {
         let result = Command::new("openvpn3")
             .arg("session-stats")
             .arg("--config")
@@ -47,7 +54,7 @@ impl OpenVpn {
             Ok(output) => {
                 let response = String::from_utf8(output.stdout).clone().unwrap();
                 if response.contains("** ERROR **") {
-                    return OpenStatsResult::Err(String::from("Error getting stats"))
+                    OpenVpnStatsResult::Err(String::from("Error getting stats"))
                 }
                 OpenVpnStatsResult::Ok(response)
             }
@@ -57,19 +64,19 @@ impl OpenVpn {
         }
     }
 
-    pub fn get_open_vpn_sessions_list() -> Status {
+    fn get_open_vpn_sessions_list(&mut self) -> &VpnStatus {
         let result = Command::new("openvpn3")
             .arg("sessions-list")
             .output();
 
-        return match result {
+        self.status = match result {
             Ok(output) => {
                 for line in output.stdout.lines() {
                     match line {
                         Ok(content) => {
                             if content.trim_start().starts_with("Status:") {
                                 let status = content.trim().strip_prefix("Status:").unwrap().trim();
-                                return match status {
+                                match status {
                                     "Web authentication required to connect" => VpnStatus::Authenticating,
                                     "Connection, Client connected" => VpnStatus::Connected,
                                     _ => VpnStatus::Error(format!("Unknown session status, {}", status))
@@ -84,30 +91,34 @@ impl OpenVpn {
             Err(_) => {
                 VpnStatus::Error(String::from("Unable to get session status"))
             }
-        }
+        };
+        &self.status
     }
 
-    pub fn disconnect_open_vpn(config: &str) {
+    fn disconnect_open_vpn(&mut self, config: &str) -> &VpnStatus {
         let result = Command::new("openvpn3")
             .arg("session-manage")
             .arg("--disconnect")
             .arg("--config")
             .arg(config)
             .output();
+
+        self.status = VpnStatus::Disconnected;
+        &self.status
     }
 }
 
 impl Connector for OpenVpn {
-    fn connect(&self) -> VpnStatus {
-        let vpn = connect_open_vpn("");
+    fn connect(&mut self) -> &VpnStatus {
+        self.connect_open_vpn(self.config)
     }
 
-    fn disconnect(&self) -> VpnStatus {
-        todo!()
+    fn disconnect(&mut self) -> &VpnStatus {
+        self.disconnect_open_vpn(self.config)
     }
 
-    fn status(&self) -> VpnStatus {
-        todo!()
+    fn status(&mut self) -> &VpnStatus {
+        self.get_open_vpn_sessions_list()
     }
 }
 
@@ -119,18 +130,19 @@ mod tests {
     fn test_connect() {
         const CONFIG: &str = "/home/mdodgson/work/sonatype/config/sonatype.ovpn";
 
-        disconnect_open_vpn(CONFIG);
-        assert_eq!(connect_open_vpn(CONFIG), VpnStatus::Connecting);
-        assert_eq!(get_open_vpn_sessions_list(), VpnStatus::Authenticating);
-        assert_eq!(get_open_vpn_sessions_list(), VpnStatus::Connected);
-        let response = get_open_vpn_stats(CONFIG);
+        let mut open_vpn = OpenVpn::new();
+        assert_eq!(open_vpn.disconnect_open_vpn(CONFIG), VpnStatus::Disconnected);
+        assert_eq!(open_vpn.connect_open_vpn(CONFIG), VpnStatus::Connecting);
+        assert_eq!(open_vpn.get_open_vpn_sessions_list(), VpnStatus::Authenticating);
+        assert_eq!(open_vpn.get_open_vpn_sessions_list(), VpnStatus::Connected);
+        let response = open_vpn.get_open_vpn_stats(CONFIG);
         match response {
-            OpenStatsResult::Ok(value) => {
+            OpenVpnStatsResult::Ok(value) => {
                 assert!(value.len() > 0)
             }
-            OpenStatsResult::Err(_) => { assert!(true)}
+            OpenVpnStatsResult::Err(_) => { assert!(true)}
         }
 
-        disconnect_open_vpn(CONFIG);
+        open_vpn.disconnect_open_vpn(CONFIG);
     }
 }

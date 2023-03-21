@@ -46,8 +46,9 @@ async fn connect(app: AppHandle,
     Ok(())
 }
 
-fn change_state(app: &AppHandle, state: &mut OpenVpnState, newConnectionState: ConnectionStatus) {
-    state.connection_status = newConnectionState;
+fn change_state(app: &AppHandle, state: &mut OpenVpnState, new_connection_state: ConnectionStatus) {
+    state.connection_status = new_connection_state;
+    update_icon(app, new_connection_state);
     emit_connection_status(&app, state);
 }
 
