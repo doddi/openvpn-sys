@@ -15,12 +15,14 @@
     await listen('connect_status', (event) => {
       console.log(event);
       connectionStatus = event.payload.connection_status
+      connectButtonDisabled = connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected'
     });
 
-    console.log('checking status');
-    connectionStatus = await invoke('check_status');
-    connectButtonDisabled = connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected'
-    console.log(connectionStatus);
+    setInterval(() => {
+      console.log('checking status');
+      invoke('check_status');
+      console.log(connectionStatus);
+    }, 1000);
   }
 
   setup();
