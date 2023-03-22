@@ -1,6 +1,6 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-
+// TODO How to move to a lib
 mod openvpn;
 mod vpn;
 mod dummyvpn;
@@ -9,7 +9,7 @@ use std::{env, fmt};
 use std::fmt::Formatter;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::sync::{Mutex};
+use std::sync::{Arc, Mutex};
 use tauri::{CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent};
 use tauri::utils::debug_eprintln;
 use crate::dummyvpn::DummyVpn;

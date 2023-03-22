@@ -15,12 +15,13 @@ pub struct OpenVpn {
     status: VpnStatus
 }
 
+// TODO Wrap Command to allow testing
 impl OpenVpn {
     pub fn new(config: String) -> Self {
         OpenVpn { config, status: VpnStatus::Disconnected }
     }
 
-    fn connect_open_vpn(&mut self) -> &VpnStatus {
+    fn connect_open_vpn(&mut self) -> VpnStatus {
         let result = Command::new("openvpn3")
             .arg("session-start")
             .arg("--config")
@@ -28,13 +29,13 @@ impl OpenVpn {
             .output();
 
         self.status = match result {
-            Ok(output) => Self::check_for_error(output),
+            Ok(output) => Self::check_connect_response(output),
             Err(_) => VpnStatus::Error(String::from("Unable to connect"))
         };
-        &self.status
+        self.status.clone()
     }
 
-    fn check_for_error(output: Output) -> VpnStatus {
+    fn check_connect_response(output: Output) -> VpnStatus {
         if !output.stdout.is_empty() {
             let response = String::from_utf8(output.stdout.clone()).unwrap();
             if response.contains("** ERROR **") {
@@ -89,7 +90,7 @@ impl OpenVpn {
         VpnStatus::Error(String::from("Status line not found"))
     }
 
-    fn get_open_vpn_sessions_list(&mut self) -> &VpnStatus {
+    fn get_open_vpn_sessions_list(&mut self) -> VpnStatus {
         let result = Command::new("openvpn3")
             .arg("sessions-list")
             .output();
@@ -99,10 +100,10 @@ impl OpenVpn {
             Err(_) => VpnStatus::Error(String::from("Unable to get session status"))
         };
         debug_eprintln!("get_open_vpn_sessions_list: {:?}", self.status);
-        &self.status
+        self.status.clone()
     }
 
-    fn disconnect_open_vpn(&mut self) -> &VpnStatus {
+    fn disconnect_open_vpn(&mut self) -> VpnStatus {
         let result = Command::new("openvpn3")
             .arg("session-manage")
             .arg("--disconnect")
@@ -111,20 +112,20 @@ impl OpenVpn {
             .output();
 
         self.status = VpnStatus::Disconnected;
-        &self.status
+        self.status.clone()
     }
 }
 
 impl VpnConnector for OpenVpn {
-    fn connect(&mut self) -> &VpnStatus {
+    fn connect(&mut self) -> VpnStatus {
         self.connect_open_vpn()
     }
 
-    fn disconnect(&mut self) -> &VpnStatus {
+    fn disconnect(&mut self) -> VpnStatus {
         self.disconnect_open_vpn()
     }
 
-    fn status(&mut self) -> &VpnStatus {
+    fn status(&mut self) -> VpnStatus {
         self.get_open_vpn_sessions_list()
     }
 }

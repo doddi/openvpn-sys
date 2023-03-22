@@ -8,7 +8,7 @@ pub enum VpnStatus {
 }
 
 pub trait VpnConnector {
-    fn connect(&mut self) -> &VpnStatus;
-    fn disconnect(&mut self) -> &VpnStatus;
-    fn status(&mut self) -> &VpnStatus;
+    fn connect(&mut self) -> VpnStatus;
+    fn disconnect(&mut self) -> VpnStatus;
+    fn status(&mut self) -> VpnStatus;
 }
