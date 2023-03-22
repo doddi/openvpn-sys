@@ -1,168 +1,148 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 // TODO How to move to a lib
-mod openvpn;
-mod vpn;
-mod dummyvpn;
 
-use std::{env, fmt};
-use std::fmt::Formatter;
+extern crate openvpn_sys;
+
+use std::{env};
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Mutex};
 use tauri::{CustomMenuItem, Icon, Manager, SystemTray, SystemTrayEvent, SystemTrayMenu, SystemTrayMenuItem, WindowEvent};
 use tauri::utils::debug_eprintln;
-use crate::dummyvpn::DummyVpn;
-use crate::openvpn::OpenVpn;
-use crate::vpn::{VpnConnector, VpnStatus};
+use openvpn_sys::create_vpn_connector;
+use openvpn_sys::prelude::*;
 
-#[derive(Copy, Clone, Debug, serde::Serialize, PartialEq)]
-enum ConnectionStatus {
-    Disconnected,
-    Initialising,
-    Connecting,
-    Connected,
-    Disconnecting,
-    Error
-}
-
-impl fmt::Display for ConnectionStatus {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            ConnectionStatus::Connected => { write!(f, "Connected") }
-            ConnectionStatus::Initialising => { write!(f, "Initialising") }
-            ConnectionStatus::Disconnected => { write!(f, "Disconnected") }
-            ConnectionStatus::Connecting => { write!(f, "Connecting") }
-            ConnectionStatus::Disconnecting => { write!(f, "Disconnecting") }
-            ConnectionStatus::Error => { write!(f, "Error") }
-        }
-    }
-}
-
-#[derive(Clone, serde::Serialize)]
-struct OpenVpnState {
-    connection_status: ConnectionStatus,
-    vpn: OpenVpn
-}
-
-impl OpenVpnState {
-    fn new(connection_status: ConnectionStatus) -> OpenVpnState {
-        OpenVpnState {
-            connection_status,
-            vpn: OpenVpn::new(String::from("/home/mdodgson/work/sonatype/config/sonatype.ovpn"))
-        }
-    }
-}
-
-impl Default for OpenVpnState {
-    fn default() -> Self {
-        OpenVpnState::new(ConnectionStatus::Disconnected)
-    }
-}
+static mut CONNECTOR: Option<Mutex<Box<dyn VpnConnector>>> = None;
 
 #[tauri::command]
 async fn connect(app: tauri::AppHandle,
-                 state: tauri::State<'_, Mutex<OpenVpnState>>) -> Result<(), ()>{
+                 status: tauri::State<'_, Mutex<VpnStatus>>) -> Result<(), ()>{
     debug_eprintln!("connect: clicked");
-    let mut guarded_state = state.lock().unwrap();
+    let mut guarded_status = status.lock().unwrap();
 
-    debug_eprintln!("connect: clicked with status {:?}", guarded_state.connection_status);
-    match guarded_state.connection_status {
-        ConnectionStatus::Disconnected => {
+    debug_eprintln!("connect: clicked with status {:?}", guarded_status);
+    match guarded_status.deref() {
+        VpnStatus::Disconnected => {
             debug_eprintln!("Connect clicked");
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Initialising);
-            let vpn_response = guarded_state.vpn.connect();
-
-            match vpn_response {
-                VpnStatus::Connected => {
-                    change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Connected);
-                }
-                VpnStatus::Connecting | VpnStatus::Authenticating => {
-                    change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Connecting);
-                }
-                _ => {
-                    change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Error);
+            change_state(&app, guarded_status.deref_mut(), VpnStatus::Initialising);
+            unsafe {
+                match &CONNECTOR {
+                    Some(connector) => {
+                        let vpn_response = connector.lock().unwrap().connect();
+                        match vpn_response {
+                            VpnStatus::Connected => {
+                                change_state(&app, guarded_status.deref_mut(), VpnStatus::Connected);
+                            }
+                            VpnStatus::Connecting | VpnStatus::Authenticating => {
+                                change_state(&app, guarded_status.deref_mut(), VpnStatus::Connecting);
+                            }
+                            _ => {
+                                change_state(&app, guarded_status.deref_mut(), VpnStatus::Error("".to_string()));
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
         }
-        ConnectionStatus::Connected => {
+        VpnStatus::Connected => {
             debug_eprintln!("Disconnect clicked");
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Disconnecting);
+            change_state(&app, guarded_status.deref_mut(), VpnStatus::Disconnecting);
 
-            let vpn_response = guarded_state.vpn.disconnect();
-            match vpn_response {
-                VpnStatus::Disconnected => {
-                    change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Disconnected);
-                }
-                _ => {
-                    change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Error);
+            unsafe {
+                match &CONNECTOR {
+                    Some(connector) => {
+                        let vpn_response = connector.lock().unwrap().disconnect();
+                        match vpn_response {
+                            VpnStatus::Disconnected => {
+                                change_state(&app, guarded_status.deref_mut(), VpnStatus::Disconnected);
+                            }
+                            _ => {
+                                change_state(&app, guarded_status.deref_mut(), VpnStatus::Error("Error disconnecting".to_string()));
+                            }
+                        }
+                    }
+                    _ => {}
                 }
             }
-
         }
         _ => {}
     }
     Ok(())
 }
 
-fn change_state(app: &tauri::AppHandle, state: &mut OpenVpnState, new_connection_state: ConnectionStatus) {
-    state.connection_status = new_connection_state;
+fn change_state(app: &tauri::AppHandle,
+                state: &mut VpnStatus,
+                new_connection_state: VpnStatus) {
+    *state = new_connection_state.clone();
     update_icon(&app, new_connection_state);
     emit_connection_status(&app, state);
 }
 
-fn emit_connection_status(app: &tauri::AppHandle, state: &mut OpenVpnState) {
+fn emit_connection_status(app: &tauri::AppHandle, state: &mut VpnStatus) {
     let unwrapped_state = state.deref().clone();
-    debug_eprintln!("emit_connection_status: {:?}", unwrapped_state.connection_status);
+    debug_eprintln!("emit_connection_status: {:?}", unwrapped_state);
 
     // TODO Should not use expect
     app.emit_to("main", "connect_status", unwrapped_state.clone())
-        .expect(format!("Unable to send {} message", unwrapped_state.connection_status).as_str());
+        .expect(format!("Unable to send {} message", unwrapped_state).as_str());
 }
 
-fn update_icon(app: &tauri::AppHandle, new_connection_state: ConnectionStatus) {
+fn update_icon(app: &tauri::AppHandle, new_connection_state: VpnStatus) {
     app.tray_handle().set_icon(get_icon(new_connection_state)).unwrap();
 }
 
-fn get_icon(connection_state: ConnectionStatus) -> Icon {
+fn get_icon(connection_state: VpnStatus) -> Icon {
     debug_eprintln!("get_icon: {}", connection_state.to_string());
     match connection_state {
-        ConnectionStatus::Disconnected => Icon::File(PathBuf::from("icons/SON_hexagon_disconnected.png")),
-        ConnectionStatus::Connected => Icon::File(PathBuf::from("icons/SON_hexagon_connected.png")),
-        ConnectionStatus::Error => Icon::File(PathBuf::from("icons/SON_hexagon_error.png")),
+        VpnStatus::Disconnected => Icon::File(PathBuf::from("icons/SON_hexagon_disconnected.png")),
+        VpnStatus::Connected => Icon::File(PathBuf::from("icons/SON_hexagon_connected.png")),
+        VpnStatus::Error(_) => Icon::File(PathBuf::from("icons/SON_hexagon_error.png")),
         _ => Icon::File(PathBuf::from("icons/SON_hexagon_intermediate.png"))
     }
 }
 
 #[tauri::command]
 async fn check_status(app: tauri::AppHandle,
-                      state: tauri::State<'_, Mutex<OpenVpnState>>) -> Result<ConnectionStatus, ()>{
+                      status: tauri::State<'_, Mutex<VpnStatus>>) -> Result<VpnStatus, ()>{
     // return Ok(ConnectionStatus::Disconnected);
     debug_eprintln!("entered check_status");
-    let mut guarded_state = state.lock().unwrap();
+    let mut guarded_status = status.lock().unwrap();
 
-    let vpn_status = guarded_state.vpn.status();
-    debug_eprintln!("check_status: {:?}", vpn_status);
-    match vpn_status {
-        VpnStatus::Disconnected => {
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Disconnected);
-        }
-        VpnStatus::Connected => {
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Connected);
-        }
-        VpnStatus::Connecting | VpnStatus::Authenticating => {
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Connecting);
-        }
-        _ => {
-            change_state(&app, guarded_state.deref_mut(), ConnectionStatus::Error);
+    unsafe {
+        match &CONNECTOR {
+            Some(connector) => {
+                let vpn_status = connector.lock().unwrap().status();
+
+                debug_eprintln!("check_status: {:?}", vpn_status);
+                match vpn_status {
+                    VpnStatus::Disconnected => {
+                        change_state(&app, guarded_status.deref_mut(), VpnStatus::Disconnected);
+                    }
+                    VpnStatus::Connected => {
+                        change_state(&app, guarded_status.deref_mut(), VpnStatus::Connected);
+                    }
+                    VpnStatus::Connecting | VpnStatus::Authenticating => {
+                        change_state(&app, guarded_status.deref_mut(), VpnStatus::Connecting);
+                    }
+                    _ => {
+                        change_state(&app, guarded_status.deref_mut(), VpnStatus::Error("".to_string()));
+                    }
+                }
+                Ok(guarded_status.clone())
+            }
+            _ => {
+                Err(())
+            }
         }
     }
-    Ok(guarded_state.connection_status)
 }
 
 fn main() {
-    // env::set_current_dir("/home/mdodgson/work/sonatype/config")
-    //     .expect("Unable to set working directory to configuration location");
+    unsafe {
+        CONNECTOR = Option::from(Mutex::new(create_vpn_connector(ConnectorType::Open)));
+    }
 
     let open = CustomMenuItem::new("open".to_string(), "Open");
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
@@ -173,7 +153,8 @@ fn main() {
     let system_tray = SystemTray::new()
         .with_menu(tray_menu);
 
-    let managed_state = Mutex::new(OpenVpnState::default());
+    let managed_state = Mutex::new(VpnStatus::Disconnected);
+
     tauri::Builder::default()
         .system_tray(system_tray)
         .on_system_tray_event(|app, event| {

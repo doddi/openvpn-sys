@@ -57,13 +57,13 @@ impl OpenVpn {
             Ok(output) => {
                 let response = String::from_utf8(output.stdout).clone().unwrap();
                 if response.contains("** ERROR **") {
-                    return OpenVpnStatsResult::Err(String::from("Error getting stats"))
-                };
-                OpenVpnStatsResult::Ok(response)
+                    OpenVpnStatsResult::Err(String::from("Error getting stats"))
+                }
+                else {
+                    OpenVpnStatsResult::Ok(response)
+                }
             }
-            Err(_) => {
-                OpenVpnStatsResult::Err(String::from("Unable to determine status"))
-            }
+            Err(_) => OpenVpnStatsResult::Err(String::from("Unable to determine status"))
         }
     }
 
@@ -104,7 +104,7 @@ impl OpenVpn {
     }
 
     fn disconnect_open_vpn(&mut self) -> VpnStatus {
-        let result = Command::new("openvpn3")
+        let _result = Command::new("openvpn3")
             .arg("session-manage")
             .arg("--disconnect")
             .arg("--config")

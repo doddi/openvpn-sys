@@ -14,7 +14,7 @@
   async function setup() {
     await listen('connect_status', (event) => {
       console.log(event);
-      connectionStatus = event.payload.connection_status
+      connectionStatus = event.payload
       connectButtonDisabled = connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected'
     });
 
