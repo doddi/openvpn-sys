@@ -1,7 +1,5 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-// TODO How to move to a lib
-
 extern crate openvpn_sys;
 
 use std::{env};
