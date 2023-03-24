@@ -7,6 +7,7 @@
 
   async function connect(){
     connectButtonDisabled = true
+    console.log("invoking connect")
     await invoke("connect")
     connectButtonDisabled = false;
   }
@@ -30,7 +31,8 @@
 
 <div>
   <div class="row">
-    <button on:click={connect} disabled={connectButtonDisabled} >
+<!--    <button on:click={connect} disabled={connectButtonDisabled}>-->
+    <button on:click={connect}>
       {connectionStatus === 'Connected' ? "Disconnect" : "Connect" }
     </button>
   </div>
