@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "openvpn-sys",
-    "version": "0.0.0"
+    "version": "0.0.1"
   },
   "tauri": {
     "allowlist": {
@@ -47,8 +47,11 @@
         "title": "openvpn-sys",
         "width": 480,
         "height": 200,
+        "x": 0,
+        "y": 0,
         "skipTaskbar": true,
-        "visible": false
+        "visible": false,
+        "alwaysOnTop": true
       }
     ],
     "systemTray": {

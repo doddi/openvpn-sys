@@ -18,5 +18,7 @@ impl VpnConnector for DummyVpn {
 }
 
 impl DummyVpn {
-    pub fn new() -> DummyVpn { DummyVpn {} }
+    pub fn new() -> DummyVpn {
+        DummyVpn {}
+    }
 }

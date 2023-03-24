@@ -9,19 +9,33 @@ pub enum VpnStatus {
     Authenticating,
     Connected,
     Disconnecting,
-    Error(String)
+    Error(String),
 }
 
 impl fmt::Display for VpnStatus {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            VpnStatus::Disconnected => { write!(f, "Disconnected") }
-            VpnStatus::Initialising => { write!(f, "Initialising") }
-            VpnStatus::Connecting => { write!(f, "Connecting") }
-            VpnStatus::Authenticating => { write!(f, "Connecting") }
-            VpnStatus::Connected => { write!(f, "Connected") }
-            VpnStatus::Disconnecting => { write!(f, "Disconnecting") }
-            VpnStatus::Error(s) => { write!(f, "Error, {}", s) }
+            VpnStatus::Disconnected => {
+                write!(f, "Disconnected")
+            }
+            VpnStatus::Initialising => {
+                write!(f, "Initialising")
+            }
+            VpnStatus::Connecting => {
+                write!(f, "Connecting")
+            }
+            VpnStatus::Authenticating => {
+                write!(f, "Authenticating")
+            }
+            VpnStatus::Connected => {
+                write!(f, "Connected")
+            }
+            VpnStatus::Disconnecting => {
+                write!(f, "Disconnecting")
+            }
+            VpnStatus::Error(s) => {
+                write!(f, "Error, {}", s)
+            }
         }
     }
 }
