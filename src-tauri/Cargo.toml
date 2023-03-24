@@ -13,6 +13,8 @@ edition = "2021"
 tauri-build = { version = "1.2", features = [] }
 
 [dependencies]
+bytes = "1"
+tokio = { version = "1", features = ["full"] }
 tauri = { version = "1.2", features = ["icon-png", "shell-open", "system-tray"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
