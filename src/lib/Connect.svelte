@@ -3,7 +3,7 @@
   import {listen} from "@tauri-apps/api/event";
 
   let connectionStatus = "Unknown"
-  let connectButtonDisabled = true
+  let connectButtonDisabled = 'disabled'
 
   async function connect(){
     console.log("Connect clicked");
@@ -23,28 +23,28 @@
 
   async function setup() {
     await listen('connect_status', (event) => {
-      console.log(event);
-      connectionStatus = event.payload
-      connectButtonDisabled = connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected';
-      console.log("disabled: " + connectButtonDisabled);
+      console.log("Listen event: " + event.payload);
+      connectionStatus = event.payload;
+      console.log(connectionStatus);
+      if (connectionStatus !== 'Connected' && connectionStatus !== 'Disconnected') {
+        connectButtonDisabled = 'disabled';
+      } else {
+        connectButtonDisabled = '';
+      }
+      console.log("Listen event status: " + connectButtonDisabled);
     });
   }
 
-  function isDisabled() {
-    console.log("thinks it is :" + connectButtonDisabled)
-    return connectButtonDisabled;
-  }
   setup();
 </script>
 
 <div>
   <div class="row">
-<!--    <button on:click={connect} disabled={isDisabled()}>-->
-    <button on:click={connect}>
+    <button on:click={connect} disabled='{connectButtonDisabled}'>
       {connectionStatus === 'Connected' ? "Disconnect" : "Connect" }
     </button>
   </div>
-  {isDisabled()}
+  <!--{isDisabled()}-->
   <p>Status: {connectionStatus}</p>
 </div>
 

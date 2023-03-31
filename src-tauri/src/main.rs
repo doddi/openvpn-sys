@@ -60,7 +60,7 @@ async fn create_status_monitor(app: AppHandle, tx_handler: Sender<VpnCommands>) 
 
     let _monitor = tokio::spawn(async move {
         loop {
-            tokio::time::sleep(Duration::from_secs(5)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
             let (tx_status_handler, rx_status_handler) = oneshot::channel();
             let status_command = VpnCommands::Status {
                 responder: tx_status_handler,
@@ -117,7 +117,7 @@ fn emit_connection_status(app: &AppHandle, state: VpnStatus) {
     debug_eprintln!("emit_connection_status: {:?}", state);
 
     // TODO Should not use expect
-    app.emit_to("main", "connect_status", state.clone())
+    app.emit_all( "connect_status", state.clone())
         .expect(format!("Unable to send {} message", state).as_str());
 }
 
